@@ -329,7 +329,7 @@ try {
 - 作用：调用文生图模型
 - 权限：`ai.image.generate`
 - 签名：`payload: { prompt: string }`
-- 返回：`{ imageUrl: string }`
+- 返回：`{ imageUrl: string; imageWidth: number; imageHeight: number; imageAspectRatio: number; imageOrientation: 'landscape'|'portrait'|'square' }`
 - 常见错误：`RATE_LIMITED`、`CREDITS_EXHAUSTED`、`REQUEST_TIMEOUT`
 - Request
 ```json
@@ -340,7 +340,11 @@ try {
 - Response
 ```json
 {
-  "imageUrl": "data:image/png;base64,iVBORw0K..."
+  "imageUrl": "https://oss.example.com/ai-generated/xxx.png",
+  "imageWidth": 1024,
+  "imageHeight": 576,
+  "imageAspectRatio": 1.777778,
+  "imageOrientation": "landscape"
 }
 ```
 
@@ -715,7 +719,7 @@ try {
 - 作用：上传 dataUrl 到托管存储，并可选创建元素
 - 权限：`editor.resource.write`
 - 签名：`payload: { dataUrl: string; fileName?: string; slideId?: number; createElement?: boolean; name?: string }`
-- 返回：`{ upload: { url?: string }; element?: unknown | null }`
+- 返回：`{ upload: { url?: string; imageWidth?: number; imageHeight?: number; imageAspectRatio?: number; imageOrientation?: 'landscape'|'portrait'|'square' }; element?: unknown | null }`
 - 常见错误：`PERMISSION_DENIED`、`RESOURCE_TOO_LARGE`、`CLOUD_QUOTA_EXCEEDED`
 - Request
 ```json
@@ -730,7 +734,13 @@ try {
 - Response
 ```json
 {
-  "upload": { "url": "https://oss.example.com/uploads/gen-image.png" },
+  "upload": {
+    "url": "https://oss.example.com/uploads/gen-image.png",
+    "imageWidth": 1200,
+    "imageHeight": 800,
+    "imageAspectRatio": 1.5,
+    "imageOrientation": "landscape"
+  },
   "element": {
     "id": "el_ab12",
     "name": "AI image",
@@ -744,7 +754,7 @@ try {
 - 作用：抓取远端图片并持久化，可选创建元素
 - 权限：`editor.resource.write`
 - 签名：`payload: { url: string; fileName?: string; slideId?: number; createElement?: boolean; name?: string }`
-- 返回：`{ upload: { url?: string }; element?: unknown | null }`
+- 返回：`{ upload: { url?: string; imageWidth?: number; imageHeight?: number; imageAspectRatio?: number; imageOrientation?: 'landscape'|'portrait'|'square' }; element?: unknown | null }`
 - 常见错误：`PERMISSION_DENIED`、`NETWORK_ERROR`、`CLOUD_QUOTA_EXCEEDED`
 - Request
 ```json
@@ -757,7 +767,13 @@ try {
 - Response
 ```json
 {
-  "upload": { "url": "https://oss.example.com/uploads/image.png" },
+  "upload": {
+    "url": "https://oss.example.com/uploads/image.png",
+    "imageWidth": 768,
+    "imageHeight": 1024,
+    "imageAspectRatio": 0.75,
+    "imageOrientation": "portrait"
+  },
   "element": {
     "id": "el_bc34",
     "name": "Remote image",

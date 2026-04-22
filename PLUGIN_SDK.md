@@ -329,7 +329,7 @@ All methods are async under `window.FacetDeck.api`.
 - Purpose: Invoke text-to-image model
 - Capability: `ai.image.generate`
 - Signature: `payload: { prompt: string }`
-- Returns: `{ imageUrl: string }`
+- Returns: `{ imageUrl: string; imageWidth: number; imageHeight: number; imageAspectRatio: number; imageOrientation: 'landscape'|'portrait'|'square' }`
 - Common errors: `RATE_LIMITED`, `CREDITS_EXHAUSTED`, `REQUEST_TIMEOUT`
 - Request:
 ```json
@@ -340,7 +340,11 @@ All methods are async under `window.FacetDeck.api`.
 - Response:
 ```json
 {
-  "imageUrl": "data:image/png;base64,iVBORw0K..."
+  "imageUrl": "https://oss.example.com/ai-generated/xxx.png",
+  "imageWidth": 1024,
+  "imageHeight": 576,
+  "imageAspectRatio": 1.777778,
+  "imageOrientation": "landscape"
 }
 ```
 
@@ -715,7 +719,7 @@ All methods are async under `window.FacetDeck.api`.
 - Purpose: Upload data URL to managed storage and optionally create element
 - Capability: `editor.resource.write`
 - Signature: `payload: { dataUrl: string; fileName?: string; slideId?: number; createElement?: boolean; name?: string }`
-- Returns: `{ upload: { url?: string }; element?: unknown | null }`
+- Returns: `{ upload: { url?: string; imageWidth?: number; imageHeight?: number; imageAspectRatio?: number; imageOrientation?: 'landscape'|'portrait'|'square' }; element?: unknown | null }`
 - Common errors: `PERMISSION_DENIED`, `RESOURCE_TOO_LARGE`, `CLOUD_QUOTA_EXCEEDED`
 - Request:
 ```json
@@ -730,7 +734,13 @@ All methods are async under `window.FacetDeck.api`.
 - Response:
 ```json
 {
-  "upload": { "url": "https://oss.example.com/uploads/gen-image.png" },
+  "upload": {
+    "url": "https://oss.example.com/uploads/gen-image.png",
+    "imageWidth": 1200,
+    "imageHeight": 800,
+    "imageAspectRatio": 1.5,
+    "imageOrientation": "landscape"
+  },
   "element": {
     "id": "el_ab12",
     "name": "AI image",
@@ -744,7 +754,7 @@ All methods are async under `window.FacetDeck.api`.
 - Purpose: Fetch remote image, persist to managed storage, optionally create element
 - Capability: `editor.resource.write`
 - Signature: `payload: { url: string; fileName?: string; slideId?: number; createElement?: boolean; name?: string }`
-- Returns: `{ upload: { url?: string }; element?: unknown | null }`
+- Returns: `{ upload: { url?: string; imageWidth?: number; imageHeight?: number; imageAspectRatio?: number; imageOrientation?: 'landscape'|'portrait'|'square' }; element?: unknown | null }`
 - Common errors: `PERMISSION_DENIED`, `NETWORK_ERROR`, `CLOUD_QUOTA_EXCEEDED`
 - Request:
 ```json
@@ -757,7 +767,13 @@ All methods are async under `window.FacetDeck.api`.
 - Response:
 ```json
 {
-  "upload": { "url": "https://oss.example.com/uploads/image.png" },
+  "upload": {
+    "url": "https://oss.example.com/uploads/image.png",
+    "imageWidth": 768,
+    "imageHeight": 1024,
+    "imageAspectRatio": 0.75,
+    "imageOrientation": "portrait"
+  },
   "element": {
     "id": "el_bc34",
     "name": "Remote image",
