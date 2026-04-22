@@ -1077,6 +1077,7 @@ async function uploadImageBufferToOss({ buffer, mimeType, folder = OSS_FOLDER ||
   return {
     key: objectKey,
     url: getOssPublicUrl(objectKey),
+    ...sniffImageGeometryFromBuffer(buffer, mimeType),
   };
 }
 
@@ -1093,6 +1094,114 @@ function parseImageDataUrl(dataUrl) {
     throw new Error("Image payload is empty");
   }
   return { buffer, mimeType, ext };
+}
+
+function normalizeImageGeometry(width, height) {
+  const imageWidth = Math.max(0, Math.floor(Number(width) || 0));
+  const imageHeight = Math.max(0, Math.floor(Number(height) || 0));
+  const imageAspectRatio =
+    imageWidth > 0 && imageHeight > 0 ? Number((imageWidth / imageHeight).toFixed(6)) : 0;
+  const imageOrientation =
+    imageWidth > imageHeight ? "landscape" : imageHeight > imageWidth ? "portrait" : "square";
+  return {
+    imageWidth,
+    imageHeight,
+    imageAspectRatio,
+    imageOrientation,
+  };
+}
+
+function sniffImageGeometryFromBuffer(buffer, mimeType = "") {
+  const safeBuffer = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || "");
+  if (safeBuffer.length < 12) return normalizeImageGeometry(0, 0);
+  const normalizedMime = String(mimeType || "").toLowerCase();
+
+  // PNG
+  if (
+    safeBuffer.length >= 24 &&
+    safeBuffer[0] === 0x89 &&
+    safeBuffer[1] === 0x50 &&
+    safeBuffer[2] === 0x4e &&
+    safeBuffer[3] === 0x47
+  ) {
+    const width = safeBuffer.readUInt32BE(16);
+    const height = safeBuffer.readUInt32BE(20);
+    return normalizeImageGeometry(width, height);
+  }
+
+  // GIF
+  if (
+    safeBuffer.length >= 10 &&
+    safeBuffer.toString("ascii", 0, 3) === "GIF"
+  ) {
+    const width = safeBuffer.readUInt16LE(6);
+    const height = safeBuffer.readUInt16LE(8);
+    return normalizeImageGeometry(width, height);
+  }
+
+  // JPEG
+  if (
+    safeBuffer.length >= 4 &&
+    safeBuffer[0] === 0xff &&
+    safeBuffer[1] === 0xd8
+  ) {
+    let offset = 2;
+    while (offset + 3 < safeBuffer.length) {
+      while (offset < safeBuffer.length && safeBuffer[offset] === 0xff) offset += 1;
+      if (offset >= safeBuffer.length) break;
+      const marker = safeBuffer[offset];
+      offset += 1;
+      if (marker === 0xd9 || marker === 0xda) break;
+      if (offset + 1 >= safeBuffer.length) break;
+      const segmentLength = safeBuffer.readUInt16BE(offset);
+      if (!segmentLength || offset + segmentLength > safeBuffer.length) break;
+      const isSofMarker =
+        (marker >= 0xc0 && marker <= 0xc3) ||
+        (marker >= 0xc5 && marker <= 0xc7) ||
+        (marker >= 0xc9 && marker <= 0xcb) ||
+        (marker >= 0xcd && marker <= 0xcf);
+      if (isSofMarker && offset + 7 < safeBuffer.length) {
+        const height = safeBuffer.readUInt16BE(offset + 3);
+        const width = safeBuffer.readUInt16BE(offset + 5);
+        return normalizeImageGeometry(width, height);
+      }
+      offset += segmentLength;
+    }
+  }
+
+  // WEBP (VP8X/VP8/VP8L)
+  if (
+    safeBuffer.length >= 30 &&
+    safeBuffer.toString("ascii", 0, 4) === "RIFF" &&
+    safeBuffer.toString("ascii", 8, 12) === "WEBP"
+  ) {
+    const chunkType = safeBuffer.toString("ascii", 12, 16);
+    if (chunkType === "VP8X" && safeBuffer.length >= 30) {
+      const width = 1 + safeBuffer.readUIntLE(24, 3);
+      const height = 1 + safeBuffer.readUIntLE(27, 3);
+      return normalizeImageGeometry(width, height);
+    }
+    if (chunkType === "VP8 " && safeBuffer.length >= 30) {
+      const width = safeBuffer.readUInt16LE(26) & 0x3fff;
+      const height = safeBuffer.readUInt16LE(28) & 0x3fff;
+      return normalizeImageGeometry(width, height);
+    }
+    if (chunkType === "VP8L" && safeBuffer.length >= 25) {
+      const b0 = safeBuffer[21];
+      const b1 = safeBuffer[22];
+      const b2 = safeBuffer[23];
+      const b3 = safeBuffer[24];
+      const width = 1 + (((b1 & 0x3f) << 8) | b0);
+      const height = 1 + (((b3 & 0x0f) << 10) | (b2 << 2) | ((b1 & 0xc0) >> 6));
+      return normalizeImageGeometry(width, height);
+    }
+  }
+
+  if (normalizedMime.includes("svg")) {
+    return normalizeImageGeometry(0, 0);
+  }
+
+  return normalizeImageGeometry(0, 0);
 }
 
 async function persistRemoteImageToOss(imageUrl, folder = `${OSS_FOLDER || "assets"}/ai-generated`) {
@@ -1120,6 +1229,7 @@ async function persistRemoteImageToOss(imageUrl, folder = `${OSS_FOLDER || "asse
   return {
     ...uploaded,
     byteSize: buffer.length,
+    ...sniffImageGeometryFromBuffer(buffer, contentType),
   };
 }
 
@@ -1446,6 +1556,10 @@ async function uploadImageBufferToStorage({ buffer, mimeType, ext, folder, req }
       storageKey: uploaded.key,
       localPath: "",
       byteSize: buffer.length,
+      imageWidth: uploaded.imageWidth,
+      imageHeight: uploaded.imageHeight,
+      imageAspectRatio: uploaded.imageAspectRatio,
+      imageOrientation: uploaded.imageOrientation,
     };
   }
   if (REQUIRE_OSS_STORAGE) {
@@ -1470,6 +1584,7 @@ async function uploadImageBufferToStorage({ buffer, mimeType, ext, folder, req }
     storageKey: "",
     localPath: filePath,
     byteSize: buffer.length,
+    ...sniffImageGeometryFromBuffer(buffer, mimeType),
   };
 }
 
@@ -1941,6 +2056,19 @@ function normalizeWizardAsset(rawAsset, index) {
   const dataUrl = String(source.dataUrl || "").trim();
   const imageUrl = String(source.imageUrl || source.url || "").trim();
   const userDescription = String(source.userDescription || "").trim().slice(0, 500);
+  const imageWidth = Math.max(0, Math.floor(Number(source.imageWidth) || 0));
+  const imageHeight = Math.max(0, Math.floor(Number(source.imageHeight) || 0));
+  const imageAspectRatio = Number(source.imageAspectRatio) > 0
+    ? Number(Number(source.imageAspectRatio).toFixed(6))
+    : (imageWidth > 0 && imageHeight > 0 ? Number((imageWidth / imageHeight).toFixed(6)) : 0);
+  const imageOrientation = String(source.imageOrientation || "").trim().toLowerCase();
+  const normalizedOrientation = imageOrientation === "landscape" || imageOrientation === "portrait" || imageOrientation === "square"
+    ? imageOrientation
+    : imageWidth > imageHeight
+    ? "landscape"
+    : imageHeight > imageWidth
+    ? "portrait"
+    : "square";
   const forcedAdopt = source.forcedAdopt === true;
   const size = Math.max(0, Number(source.size) || 0);
   const isImageMime = /^image\/[a-z0-9.+-]+$/i.test(mimeType);
@@ -1954,6 +2082,10 @@ function normalizeWizardAsset(rawAsset, index) {
     size,
     dataUrl: safeDataUrl,
     imageUrl: safeImageUrl,
+    imageWidth,
+    imageHeight,
+    imageAspectRatio,
+    imageOrientation: normalizedOrientation,
     userDescription,
     forcedAdopt,
     isImage: isImageMime || isDataUrlImage || Boolean(safeImageUrl),
@@ -1985,6 +2117,10 @@ function normalizeOutlineDraft(rawPrompt, rawOutline) {
               prompt,
               status: imageUrl ? "done" : "idle",
               imageUrl: /^https?:\/\//i.test(imageUrl) ? imageUrl.slice(0, 2000) : "",
+              imageWidth: Math.max(0, Math.floor(Number(sourcePrompt.imageWidth) || 0)),
+              imageHeight: Math.max(0, Math.floor(Number(sourcePrompt.imageHeight) || 0)),
+              imageAspectRatio: Number(sourcePrompt.imageAspectRatio) > 0 ? Number(Number(sourcePrompt.imageAspectRatio).toFixed(6)) : 0,
+              imageOrientation: String(sourcePrompt.imageOrientation || "").trim().toLowerCase(),
               error: "",
             };
           })
@@ -3117,6 +3253,10 @@ function normalizeDeckDraft(rawPrompt, raw) {
                   prompt,
                   status: imageUrl ? "done" : "idle",
                   imageUrl: /^https?:\/\//i.test(imageUrl) ? imageUrl.slice(0, 2000) : "",
+                  imageWidth: Math.max(0, Math.floor(Number(sourcePrompt.imageWidth) || 0)),
+                  imageHeight: Math.max(0, Math.floor(Number(sourcePrompt.imageHeight) || 0)),
+                  imageAspectRatio: Number(sourcePrompt.imageAspectRatio) > 0 ? Number(Number(sourcePrompt.imageAspectRatio).toFixed(6)) : 0,
+                  imageOrientation: String(sourcePrompt.imageOrientation || "").trim().toLowerCase(),
                   error: "",
                 };
               })
@@ -3625,6 +3765,10 @@ async function runPptGenerationJob({
               source: "uploaded",
               name: asset.name,
               imageUrl: asset.imageUrl || "",
+              imageWidth: asset.imageWidth || 0,
+              imageHeight: asset.imageHeight || 0,
+              imageAspectRatio: asset.imageAspectRatio || 0,
+              imageOrientation: asset.imageOrientation || "",
               description: asset.userDescription || "",
               descriptionSource: "userDescription",
             }))
@@ -3638,6 +3782,10 @@ async function runPptGenerationJob({
               source: "ai-generated",
               name: `AI image ${promptIndex + 1}`,
               imageUrl: String(item.imageUrl || "").trim(),
+              imageWidth: Math.max(0, Math.floor(Number(item.imageWidth) || 0)),
+              imageHeight: Math.max(0, Math.floor(Number(item.imageHeight) || 0)),
+              imageAspectRatio: Number(item.imageAspectRatio) > 0 ? Number(Number(item.imageAspectRatio).toFixed(6)) : 0,
+              imageOrientation: String(item.imageOrientation || "").trim().toLowerCase(),
               description: String(item.prompt || "").trim(),
               descriptionSource: "aiImagePrompt",
             }))
@@ -5492,6 +5640,11 @@ app.post("/api/ppt/generate-outline", authRequired, async (req, res) => {
       assets: normalizedAssets.map((asset) => ({
         id: asset.id,
         name: asset.name,
+        imageUrl: asset.imageUrl || "",
+        imageWidth: asset.imageWidth || 0,
+        imageHeight: asset.imageHeight || 0,
+        imageAspectRatio: asset.imageAspectRatio || 0,
+        imageOrientation: asset.imageOrientation || "",
         userDescription: asset.userDescription,
       })),
     });
@@ -5563,6 +5716,11 @@ app.post("/api/ppt/revise-outline", authRequired, async (req, res) => {
             assets: normalizedAssets.map((asset) => ({
               id: asset.id,
               name: asset.name,
+              imageUrl: asset.imageUrl || "",
+              imageWidth: asset.imageWidth || 0,
+              imageHeight: asset.imageHeight || 0,
+              imageAspectRatio: asset.imageAspectRatio || 0,
+              imageOrientation: asset.imageOrientation || "",
               userDescription: asset.userDescription,
             })),
             outline,
@@ -5620,6 +5778,10 @@ app.post("/api/assets/upload-data-url", authRequired, async (req, res) => {
       ok: true,
       key: uploaded.key,
       url: uploaded.url,
+      imageWidth: uploaded.imageWidth || 0,
+      imageHeight: uploaded.imageHeight || 0,
+      imageAspectRatio: uploaded.imageAspectRatio || 0,
+      imageOrientation: uploaded.imageOrientation || "square",
     });
   } catch (error) {
     return res.status(error?.httpStatus || 400).json({ error: error instanceof Error ? error.message : "Failed to upload image" });
@@ -5680,6 +5842,10 @@ app.post("/api/assets/upload-remote-url", authRequired, async (req, res) => {
       url: uploaded.url,
       byteSize: uploaded.byteSize,
       storageType: uploaded.storageType,
+      imageWidth: uploaded.imageWidth || 0,
+      imageHeight: uploaded.imageHeight || 0,
+      imageAspectRatio: uploaded.imageAspectRatio || 0,
+      imageOrientation: uploaded.imageOrientation || "square",
     });
   } catch (error) {
     return res.status(error?.httpStatus || 400).json({ error: error instanceof Error ? error.message : "Failed to upload remote image" });
@@ -6170,10 +6336,21 @@ app.post("/api/ppt/generate-outline-image", authRequired, async (req, res) => {
       return;
     }
     let persistedUrl = "";
+    let imageGeometry = normalizeImageGeometry(0, 0);
+    if (/^data:image\/[a-z0-9.+-]+;base64,/i.test(imageUrl)) {
+      const parsed = parseImageDataUrl(imageUrl);
+      imageGeometry = sniffImageGeometryFromBuffer(parsed.buffer, parsed.mimeType);
+    }
     try {
       const persisted = await persistRemoteImageToOss(imageUrl, `${OSS_FOLDER || "assets"}/ai-generated`);
       if (persisted?.url) {
         persistedUrl = persisted.url;
+        imageGeometry = {
+          imageWidth: persisted.imageWidth || 0,
+          imageHeight: persisted.imageHeight || 0,
+          imageAspectRatio: persisted.imageAspectRatio || 0,
+          imageOrientation: persisted.imageOrientation || "square",
+        };
         await registerManagedAssetRecord({
           publicUrl: persisted.url,
           storageType: "oss",
@@ -6188,6 +6365,10 @@ app.post("/api/ppt/generate-outline-image", authRequired, async (req, res) => {
       imageUrl: persistedUrl || imageUrl,
       sourceImageUrl: imageUrl,
       persisted: Boolean(persistedUrl),
+      imageWidth: imageGeometry.imageWidth,
+      imageHeight: imageGeometry.imageHeight,
+      imageAspectRatio: imageGeometry.imageAspectRatio,
+      imageOrientation: imageGeometry.imageOrientation,
     });
   } catch (error) {
     res.status(400).json({ error: error instanceof Error ? error.message : "Failed to generate image" });

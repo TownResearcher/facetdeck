@@ -128,7 +128,7 @@ const API_DOCS: ApiDoc[] = [
     purpose: "Invoke text-to-image model.",
     capability: "ai.image.generate",
     signature: "payload: { prompt: string }",
-    returns: "{ imageUrl: string }",
+    returns: "{ imageUrl: string; imageWidth: number; imageHeight: number; imageAspectRatio: number; imageOrientation: 'landscape'|'portrait'|'square' }",
     example: "await api.ai.image.generate({ prompt: 'A minimal gradient icon' })",
     commonErrors: "RATE_LIMITED, CREDITS_EXHAUSTED, REQUEST_TIMEOUT",
   },
@@ -339,7 +339,7 @@ const API_DOCS: ApiDoc[] = [
     purpose: "Upload image dataUrl to managed storage and optionally create element.",
     capability: "editor.resource.write",
     signature: "payload: { dataUrl: string; fileName?: string; slideId?: number; createElement?: boolean; name?: string }",
-    returns: "{ upload: { url?: string }; element?: unknown | null }",
+    returns: "{ upload: { url?: string; imageWidth?: number; imageHeight?: number; imageAspectRatio?: number; imageOrientation?: 'landscape'|'portrait'|'square' }; element?: unknown | null }",
     example: "await api.resources.uploadDataUrl({ dataUrl, createElement: true })",
     commonErrors: "PERMISSION_DENIED, RESOURCE_TOO_LARGE, CLOUD_QUOTA_EXCEEDED",
   },
@@ -349,7 +349,7 @@ const API_DOCS: ApiDoc[] = [
     purpose: "Fetch remote image then persist to managed storage and optionally create element.",
     capability: "editor.resource.write",
     signature: "payload: { url: string; fileName?: string; slideId?: number; createElement?: boolean; name?: string }",
-    returns: "{ upload: { url?: string }; element?: unknown | null }",
+    returns: "{ upload: { url?: string; imageWidth?: number; imageHeight?: number; imageAspectRatio?: number; imageOrientation?: 'landscape'|'portrait'|'square' }; element?: unknown | null }",
     example: "await api.resources.uploadRemoteUrl({ url, createElement: true })",
     commonErrors: "PERMISSION_DENIED, NETWORK_ERROR, CLOUD_QUOTA_EXCEEDED",
   },
@@ -439,7 +439,11 @@ const API_JSON_EXAMPLES: Record<string, { request: string; response: string }> =
   "prompt": "A minimal orange abstract shape"
 }`,
     response: `{
-  "imageUrl": "data:image/png;base64,iVBORw0K..."
+  "imageUrl": "https://oss.example.com/ai-generated/xxx.png",
+  "imageWidth": 1024,
+  "imageHeight": 576,
+  "imageAspectRatio": 1.777778,
+  "imageOrientation": "landscape"
 }`,
   },
   "storage.get(key)": {
@@ -624,7 +628,13 @@ const API_JSON_EXAMPLES: Record<string, { request: string; response: string }> =
   "name": "AI image"
 }`,
     response: `{
-  "upload": { "url": "https://oss.example.com/uploads/gen-image.png" },
+  "upload": {
+    "url": "https://oss.example.com/uploads/gen-image.png",
+    "imageWidth": 1200,
+    "imageHeight": 800,
+    "imageAspectRatio": 1.5,
+    "imageOrientation": "landscape"
+  },
   "element": {
     "id": "el_ab12",
     "name": "AI image",
@@ -640,7 +650,13 @@ const API_JSON_EXAMPLES: Record<string, { request: string; response: string }> =
   "createElement": true
 }`,
     response: `{
-  "upload": { "url": "https://oss.example.com/uploads/image.png" },
+  "upload": {
+    "url": "https://oss.example.com/uploads/image.png",
+    "imageWidth": 768,
+    "imageHeight": 1024,
+    "imageAspectRatio": 0.75,
+    "imageOrientation": "portrait"
+  },
   "element": {
     "id": "el_bc34",
     "name": "Remote image",

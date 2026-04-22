@@ -1037,6 +1037,10 @@ export function Editor() {
                 mimeType: file.type || "image/*",
                 size: file.size,
                 dataUrl: String(reader.result || ""),
+                imageWidth: 0,
+                imageHeight: 0,
+                imageAspectRatio: 0,
+                imageOrientation: "square",
                 userDescription: "",
                 adopt: true,
                 reason: "User uploaded image",
@@ -1051,6 +1055,10 @@ export function Editor() {
                 mimeType: file.type || "image/*",
                 size: file.size,
                 dataUrl: "",
+                imageWidth: 0,
+                imageHeight: 0,
+                imageAspectRatio: 0,
+                imageOrientation: "square",
                 userDescription: "",
                 adopt: true,
                 reason: "Failed to read file",
@@ -1083,6 +1091,16 @@ export function Editor() {
                     : "idle"
                 ) as "idle" | "generating" | "done" | "failed",
                 imageUrl: String(item?.imageUrl || "").trim(),
+                imageWidth: Math.max(0, Math.floor(Number(item?.imageWidth) || 0)),
+                imageHeight: Math.max(0, Math.floor(Number(item?.imageHeight) || 0)),
+                imageAspectRatio: Number(item?.imageAspectRatio) > 0 ? Number(item?.imageAspectRatio) : 0,
+                imageOrientation: (
+                  String(item?.imageOrientation || "").trim().toLowerCase() === "landscape" ||
+                  String(item?.imageOrientation || "").trim().toLowerCase() === "portrait" ||
+                  String(item?.imageOrientation || "").trim().toLowerCase() === "square"
+                    ? String(item?.imageOrientation || "").trim().toLowerCase()
+                    : "square"
+                ) as "landscape" | "portrait" | "square",
                 error: String(item?.error || "").trim(),
               }))
               .filter((item) => item.prompt);
@@ -1157,6 +1175,16 @@ export function Editor() {
           throw new Error(String(data?.error || "Failed to generate image"));
         }
         const imageUrl = String(data?.imageUrl || "").trim();
+        const imageWidth = Math.max(0, Math.floor(Number(data?.imageWidth) || 0));
+        const imageHeight = Math.max(0, Math.floor(Number(data?.imageHeight) || 0));
+        const imageAspectRatio = Number(data?.imageAspectRatio) > 0 ? Number(data?.imageAspectRatio) : 0;
+        const imageOrientation = (
+          String(data?.imageOrientation || "").trim().toLowerCase() === "landscape" ||
+          String(data?.imageOrientation || "").trim().toLowerCase() === "portrait" ||
+          String(data?.imageOrientation || "").trim().toLowerCase() === "square"
+            ? String(data?.imageOrientation || "").trim().toLowerCase()
+            : "square"
+        ) as "landscape" | "portrait" | "square";
         if (!imageUrl) {
           throw new Error("Image provider returned empty URL");
         }
@@ -1171,7 +1199,16 @@ export function Editor() {
                     ...item,
                     aiImagePrompts: (item.aiImagePrompts || []).map((promptItem) =>
                       promptItem.id === promptId
-                        ? { ...promptItem, status: "done", imageUrl, error: "" }
+                        ? {
+                            ...promptItem,
+                            status: "done",
+                            imageUrl,
+                            imageWidth,
+                            imageHeight,
+                            imageAspectRatio,
+                            imageOrientation,
+                            error: "",
+                          }
                         : promptItem,
                     ),
                   },
@@ -1247,6 +1284,15 @@ export function Editor() {
           mimeType: String(asset.mimeType || "").trim(),
           size: Number(asset.size) || 0,
           imageUrl,
+          imageWidth: Math.max(0, Math.floor(Number(asset.imageWidth) || 0)),
+          imageHeight: Math.max(0, Math.floor(Number(asset.imageHeight) || 0)),
+          imageAspectRatio: Number(asset.imageAspectRatio) > 0 ? Number(asset.imageAspectRatio) : 0,
+          imageOrientation:
+            asset.imageOrientation === "landscape" ||
+            asset.imageOrientation === "portrait" ||
+            asset.imageOrientation === "square"
+              ? asset.imageOrientation
+              : "square",
           userDescription: String(asset.userDescription || "").trim(),
           adopt: asset.adopt !== false,
           reason: String(asset.reason || "").trim(),
@@ -1294,13 +1340,35 @@ export function Editor() {
           if (!uploadedUrl) {
             throw new Error(`Uploaded ${asset.name || "asset"} but got empty URL`);
           }
-          return { id: asset.id, imageUrl: uploadedUrl };
+          return {
+            id: asset.id,
+            imageUrl: uploadedUrl,
+            imageWidth: Math.max(0, Math.floor(Number(data?.imageWidth) || 0)),
+            imageHeight: Math.max(0, Math.floor(Number(data?.imageHeight) || 0)),
+            imageAspectRatio: Number(data?.imageAspectRatio) > 0 ? Number(data?.imageAspectRatio) : 0,
+            imageOrientation:
+              String(data?.imageOrientation || "").trim().toLowerCase() === "landscape" ||
+              String(data?.imageOrientation || "").trim().toLowerCase() === "portrait" ||
+              String(data?.imageOrientation || "").trim().toLowerCase() === "square"
+                ? String(data?.imageOrientation || "").trim().toLowerCase()
+                : "square",
+          };
         }),
       );
-      const urlMap = new Map(uploaded.map((item) => [item.id, item.imageUrl]));
+      const uploadedMap = new Map(uploaded.map((item) => [item.id, item]));
       const nextAssets = wizardAssets.map((asset) =>
-        urlMap.has(asset.id)
-          ? { ...asset, imageUrl: urlMap.get(asset.id) }
+        uploadedMap.has(asset.id)
+          ? {
+              ...asset,
+              imageUrl: uploadedMap.get(asset.id)?.imageUrl,
+              imageWidth: uploadedMap.get(asset.id)?.imageWidth || 0,
+              imageHeight: uploadedMap.get(asset.id)?.imageHeight || 0,
+              imageAspectRatio: uploadedMap.get(asset.id)?.imageAspectRatio || 0,
+              imageOrientation: (uploadedMap.get(asset.id)?.imageOrientation || "square") as
+                | "landscape"
+                | "portrait"
+                | "square",
+            }
           : asset,
       );
       setWizardAssets(nextAssets);

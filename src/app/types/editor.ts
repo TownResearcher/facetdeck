@@ -177,6 +177,11 @@ export type EditorWizardAsset = {
   mimeType: string;
   size: number;
   dataUrl: string;
+  imageUrl?: string;
+  imageWidth?: number;
+  imageHeight?: number;
+  imageAspectRatio?: number;
+  imageOrientation?: "landscape" | "portrait" | "square";
   url?: string;
   userDescription: string;
   adopt: boolean;
@@ -200,6 +205,10 @@ export type EditorOutlineSlide = {
     prompt: string;
     status?: "idle" | "generating" | "done" | "failed";
     imageUrl?: string;
+    imageWidth?: number;
+    imageHeight?: number;
+    imageAspectRatio?: number;
+    imageOrientation?: "landscape" | "portrait" | "square";
     error?: string;
   }>;
 };
