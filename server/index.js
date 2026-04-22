@@ -55,7 +55,7 @@ const OSS_PUBLIC_BASE_URL = String(process.env.OSS_PUBLIC_BASE_URL || "").trim()
 const OSS_FOLDER = String(process.env.OSS_FOLDER || "assets").trim();
 const INITIAL_SYSTEM_CREDITS = Number(process.env.INITIAL_SYSTEM_CREDITS || 200_000);
 const CLOUD_DRIVE_QUOTA_BYTES = Number(process.env.CLOUD_DRIVE_QUOTA_BYTES || 5 * 1024 * 1024 * 1024);
-const INVITE_REWARD_CREDITS = 50_000;
+const INVITE_REWARD_CREDITS = Number(process.env.INVITE_REWARD_CREDITS || 50_000);
 const CREDIT_COST_INPUT_PER_M_TOKENS = Number(process.env.CREDIT_COST_INPUT_PER_M_TOKENS || 20_000);
 const CREDIT_COST_OUTPUT_PER_M_TOKENS = Number(process.env.CREDIT_COST_OUTPUT_PER_M_TOKENS || 120_000);
 const CREDIT_COST_IMAGE_PER_GENERATION = Number(process.env.CREDIT_COST_IMAGE_PER_GENERATION || 2_000);
@@ -704,7 +704,7 @@ async function initializeDatabase() {
       invite_code TEXT UNIQUE,
       invited_by_user_id INTEGER,
       use_managed_models INTEGER NOT NULL DEFAULT 1,
-      credits_balance INTEGER NOT NULL DEFAULT 200000,
+      credits_balance INTEGER NOT NULL DEFAULT ${Math.max(0, Math.floor(INITIAL_SYSTEM_CREDITS))},
       cloud_used_bytes INTEGER NOT NULL DEFAULT 0,
       cloud_quota_bytes INTEGER NOT NULL DEFAULT 5368709120,
       created_at INTEGER NOT NULL
@@ -3572,7 +3572,7 @@ async function runPptGenerationJob({
     const normalizedAssets = Array.isArray(assets)
       ? assets
           .map((item, index) => normalizeWizardAsset(item, index))
-          .filter((item) => item.isImage && (item.dataUrl || item.imageUrl))
+          .filter((item) => item.isImage && item.imageUrl)
       : [];
     const assetById = new Map(normalizedAssets.map((item) => [item.id, item]));
 
@@ -3624,7 +3624,7 @@ async function runPptGenerationJob({
               id: asset.id,
               source: "uploaded",
               name: asset.name,
-              imageUrl: asset.dataUrl || asset.imageUrl || "",
+              imageUrl: asset.imageUrl || "",
               description: asset.userDescription || "",
               descriptionSource: "userDescription",
             }))
@@ -3647,8 +3647,8 @@ async function runPptGenerationJob({
         const adoptedAsset = nextSlide.imageAssetIds
           .map((assetId) => assetById.get(String(assetId || "").trim()))
           .find(Boolean);
-        if (adoptedAsset?.dataUrl || adoptedAsset?.imageUrl) {
-          nextSlide.imageUrl = adoptedAsset.dataUrl || adoptedAsset.imageUrl;
+        if (adoptedAsset?.imageUrl) {
+          nextSlide.imageUrl = adoptedAsset.imageUrl;
         }
       }
       if (!nextSlide.imageUrl && Array.isArray(nextSlide.aiImagePrompts) && nextSlide.aiImagePrompts.length > 0) {
@@ -6600,8 +6600,16 @@ app.post("/api/auth/register", async (req, res) => {
   const displayName = await generateUniqueInitialDisplayName();
   const selfInviteCode = await generateUniqueInviteCode();
   const result = await run(
-    "INSERT INTO users (email, password_hash, display_name, invite_code, invited_by_user_id, created_at) VALUES (?, ?, ?, ?, ?, ?)",
-    [email, passwordHash, displayName, selfInviteCode, inviterUserId > 0 ? inviterUserId : null, now],
+    "INSERT INTO users (email, password_hash, display_name, invite_code, invited_by_user_id, credits_balance, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    [
+      email,
+      passwordHash,
+      displayName,
+      selfInviteCode,
+      inviterUserId > 0 ? inviterUserId : null,
+      Math.max(0, Math.floor(INITIAL_SYSTEM_CREDITS)),
+      now,
+    ],
   );
 
   if (inviterUserId > 0) {

@@ -449,6 +449,7 @@ export function Editor() {
     setMixSelection,
   } = useEditorWizardState();
   const [wizardAssets, setWizardAssets] = useState<EditorWizardAsset[]>([]);
+  const [isUploadingWizardAssets, setIsUploadingWizardAssets] = useState(false);
   const [outlineDraft, setOutlineDraft] = useState<EditorOutlineDraft | null>(null);
   const [isGeneratingOutline, setIsGeneratingOutline] = useState(false);
   const [outlineInstruction, setOutlineInstruction] = useState("");
@@ -1235,6 +1236,80 @@ export function Editor() {
     }
   };
 
+  const toModelWizardAssets = (assets: EditorWizardAsset[]) =>
+    assets
+      .map((asset) => {
+        const imageUrl = String((asset as { imageUrl?: string; url?: string }).imageUrl || (asset as { url?: string }).url || "").trim();
+        if (!imageUrl) return null;
+        return {
+          id: String(asset.id || "").trim(),
+          name: String(asset.name || "").trim(),
+          mimeType: String(asset.mimeType || "").trim(),
+          size: Number(asset.size) || 0,
+          imageUrl,
+          userDescription: String(asset.userDescription || "").trim(),
+          adopt: asset.adopt !== false,
+          reason: String(asset.reason || "").trim(),
+          forcedAdopt: asset.forcedAdopt === true,
+          suggestedUsage: Array.isArray(asset.suggestedUsage) ? asset.suggestedUsage : [],
+        };
+      })
+      .filter((asset): asset is NonNullable<typeof asset> => Boolean(asset));
+
+  const ensureWizardAssetsUploadedToOss = async () => {
+    const token = localStorage.getItem("auth_token");
+    if (!token) {
+      throw new Error("Please sign in first");
+    }
+    const candidates = wizardAssets.filter((asset) => {
+      const imageUrl = String((asset as { imageUrl?: string; url?: string }).imageUrl || (asset as { url?: string }).url || "").trim();
+      const dataUrl = String(asset.dataUrl || "").trim();
+      return !imageUrl && dataUrl.startsWith("data:image/");
+    });
+    if (candidates.length === 0) {
+      return wizardAssets;
+    }
+
+    setIsUploadingWizardAssets(true);
+    try {
+      const uploaded = await Promise.all(
+        candidates.map(async (asset) => {
+          const response = await fetch("/api/assets/upload-data-url", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              dataUrl: String(asset.dataUrl || "").trim(),
+              fileName: String(asset.name || "wizard-asset.png").trim() || "wizard-asset.png",
+              folder: "user-elements",
+            }),
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok) {
+            throw new Error(String(data?.error || `Failed to upload ${asset.name || "asset"}`));
+          }
+          const uploadedUrl = String(data?.url || "").trim();
+          if (!uploadedUrl) {
+            throw new Error(`Uploaded ${asset.name || "asset"} but got empty URL`);
+          }
+          return { id: asset.id, imageUrl: uploadedUrl };
+        }),
+      );
+      const urlMap = new Map(uploaded.map((item) => [item.id, item.imageUrl]));
+      const nextAssets = wizardAssets.map((asset) =>
+        urlMap.has(asset.id)
+          ? { ...asset, imageUrl: urlMap.get(asset.id) }
+          : asset,
+      );
+      setWizardAssets(nextAssets);
+      return nextAssets;
+    } finally {
+      setIsUploadingWizardAssets(false);
+    }
+  };
+
   const handleGenerateOutline = async () => {
     if (!wizardData.idea.trim()) {
       toast.error("Please enter your idea");
@@ -1247,17 +1322,13 @@ export function Editor() {
     }
     setIsGeneratingOutline(true);
     try {
+      const preparedAssets = await ensureWizardAssetsUploadedToOss();
       const response = await fetch("/api/ppt/generate-outline", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({
           ...wizardData,
-          assets: wizardAssets
-            .filter((asset) => asset.dataUrl || String((asset as { url?: string }).url || "").trim())
-            .map((asset) => ({
-              ...asset,
-              userDescription: String(asset.userDescription || "").trim(),
-            })),
+          assets: toModelWizardAssets(preparedAssets),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -1293,6 +1364,7 @@ export function Editor() {
     }
     setIsRevisingOutline(true);
     try {
+      const preparedAssets = await ensureWizardAssetsUploadedToOss();
       const response = await fetch("/api/ppt/revise-outline", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
@@ -1300,9 +1372,7 @@ export function Editor() {
           ...wizardData,
           outline: outlineDraft,
           instruction,
-          assets: wizardAssets
-            .filter((asset) => asset.dataUrl || String((asset as { url?: string }).url || "").trim())
-            .map((asset) => ({ ...asset, userDescription: String(asset.userDescription || "").trim() })),
+          assets: toModelWizardAssets(preparedAssets),
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -1402,6 +1472,12 @@ export function Editor() {
       const missingDescription = wizardAssets.some((asset) => !asset.userDescription.trim());
       if (missingDescription) {
         toast.error("Please input image description for each image");
+        return;
+      }
+      try {
+        await ensureWizardAssetsUploadedToOss();
+      } catch (error) {
+        toast.error(getErrorMessage(error, "Failed to upload materials to OSS"));
         return;
       }
       if (outlineDraft && Array.isArray(outlineDraft.slides) && outlineDraft.slides.length > 0) {
@@ -2036,6 +2112,7 @@ export function Editor() {
   const handleStartGeneration = async (style: EditorStylePreview, styleSelection?: EditorStyleSelectionPayload) => {
     const token = localStorage.getItem("auth_token");
     try {
+      const preparedAssets = await ensureWizardAssetsUploadedToOss();
       startInitialGenerationConversation(wizardData.idea);
       setWizardOpen(false);
       const response = await fetch("/api/ppt/generate", {
@@ -2046,9 +2123,7 @@ export function Editor() {
           style,
           styleSelection: styleSelection || { mode: "single", baseStyleId: style.id },
           outline: outlineDraft,
-          assets: wizardAssets
-            .filter((asset) => asset.dataUrl || String((asset as { url?: string }).url || "").trim())
-            .map((asset) => ({ ...asset, userDescription: String(asset.userDescription || "").trim() })),
+          assets: toModelWizardAssets(preparedAssets),
         }),
       });
       const data = await response.json();
@@ -3945,8 +4020,12 @@ export function Editor() {
   };
 
   const materialsMissingDescription = wizardAssets.some((asset) => !asset.userDescription.trim());
-  const canProceedFromMaterials = !materialsMissingDescription;
-  const materialsNextDisabledReason = materialsMissingDescription ? "Please add a description for each image" : "";
+  const canProceedFromMaterials = !materialsMissingDescription && !isUploadingWizardAssets;
+  const materialsNextDisabledReason = isUploadingWizardAssets
+    ? "Uploading materials to OSS..."
+    : materialsMissingDescription
+    ? "Please add a description for each image"
+    : "";
   const currentSlideThemeColors = (() => {
     if (!activeSlideData) {
       return themeColors;
