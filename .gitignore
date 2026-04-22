@@ -1,0 +1,39 @@
+# dependencies
+node_modules/
+
+# build outputs
+dist/
+build/
+coverage/
+
+# environment and secrets
+.env
+.env.*
+!.env.example
+
+# runtime databases and sensitive data
+database/*.db
+database/*.sqlite
+database/*.sqlite3
+database/user-presets/
+*.db
+*.sqlite
+*.sqlite3
+
+# logs and temp files
+*.log
+logs/
+tmp/
+temp/
+*.pid
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# local assets that may include private data
+uploads/
+backups/
+private/

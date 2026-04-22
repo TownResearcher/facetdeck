@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FacetDeck Plugin Vite Sample</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+      }
+      body {
+        margin: 0;
+        padding: 16px;
+        background: transparent;
+        color: #0f172a;
+      }
+      .panel {
+        border: 1px solid #e2e8f0;
+        border-radius: 14px;
+        padding: 14px;
+        background: #ffffffcc;
+        backdrop-filter: blur(4px);
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-top: 8px;
+      }
+      input, button {
+        border-radius: 10px;
+        border: 1px solid #cbd5e1;
+        font: inherit;
+      }
+      input {
+        flex: 1;
+        padding: 10px 12px;
+      }
+      button {
+        padding: 10px 12px;
+        cursor: pointer;
+        background: #ff6b35;
+        color: white;
+        border: none;
+        font-weight: 600;
+      }
+      pre {
+        margin-top: 10px;
+        background: #0f172a;
+        color: #e2e8f0;
+        border-radius: 10px;
+        padding: 10px;
+        max-height: 220px;
+        overflow: auto;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+  </html>

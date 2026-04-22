@@ -1,0 +1,13 @@
+{
+  "id": "vite-sample-image-helper",
+  "name": "Vite Sample Image Helper",
+  "version": "1.0.0",
+  "description": "Sample plugin that reads slide HTML and inserts generated images.",
+  "capabilities": [
+    "context.pageHtml.read",
+    "ai.image.generate",
+    "editor.slide.read",
+    "editor.slide.write",
+    "editor.resource.write"
+  ]
+}
