@@ -1,5 +1,5 @@
-import { createElement } from "react";
-import { createBrowserRouter, Navigate, redirect } from "react-router";
+import { createElement, useEffect } from "react";
+import { createBrowserRouter, Navigate, redirect, useParams } from "react-router";
 import { Root } from "./Root";
 import { Home } from "./pages/Home";
 import { Editor } from "./pages/Editor";
@@ -50,6 +50,19 @@ async function redirectIfAuthedLoader() {
   return null;
 }
 
+function ShareRedirect() {
+  const { shareCode } = useParams();
+  useEffect(() => {
+    const resolvedCode = String(shareCode || "").trim();
+    if (!resolvedCode) {
+      window.location.replace("/home");
+      return;
+    }
+    window.location.replace(`/api/share/${encodeURIComponent(resolvedCode)}`);
+  }, [shareCode]);
+  return null;
+}
+
 export const router = createBrowserRouter([
   {
     path: "/",
@@ -74,6 +87,7 @@ export const router = createBrowserRouter([
       { path: "profile", Component: Profile, loader: requireAuthLoader },
       { path: "repository", Component: Repository, loader: requireAuthLoader },
       { path: "style-preview/:previewId", Component: StylePreview, loader: requireAuthLoader },
+      { path: "share/:shareCode", Component: ShareRedirect },
       { path: "auth", element: createElement(Navigate, { to: "/login", replace: true }) },
     ],
   },

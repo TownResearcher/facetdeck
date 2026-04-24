@@ -2013,8 +2013,34 @@ function stripCodeFence(text) {
   return source;
 }
 
+function stripThinkPreamble(text) {
+  const source = String(text || "").trim();
+  if (!source) {
+    return "";
+  }
+  // Remove complete think blocks first.
+  let cleaned = source.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+  // Some providers return an opening <think> without a closing tag.
+  // Strip that orphan opening tag, then cut to first JSON token.
+  if (/^<think\b/i.test(cleaned)) {
+    cleaned = cleaned.replace(/^<think\b[^>]*>/i, "").trim();
+    const firstArray = cleaned.indexOf("[");
+    const firstObject = cleaned.indexOf("{");
+    const firstJsonStart =
+      firstArray < 0
+        ? firstObject
+        : firstObject < 0
+        ? firstArray
+        : Math.min(firstArray, firstObject);
+    if (firstJsonStart > 0) {
+      cleaned = cleaned.slice(firstJsonStart).trim();
+    }
+  }
+  return cleaned || source;
+}
+
 function parseJsonFromModelContent(content) {
-  const cleaned = stripCodeFence(content);
+  const cleaned = stripCodeFence(stripThinkPreamble(content));
   try {
     return JSON.parse(cleaned);
   } catch (_error) {
@@ -2603,7 +2629,13 @@ async function generateSingleStylePreviewPackage({
     temperature: 0.7,
     messages,
   });
-  const parsed = parseJsonFromModelContent(content);
+  let parsed = null;
+  try {
+    const contentWithoutThink = String(content || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/^<think\b[^>]*>/i, "").trim();
+    parsed = parseJsonFromModelContent(contentWithoutThink || content);
+  } catch (error) {
+    throw error;
+  }
   const rawPackage = Array.isArray(parsed) ? parsed[0] : parsed;
   return normalizeStylePreviewPackage({
     rawPackage,
@@ -2682,7 +2714,13 @@ async function generateSelectionStylePreviewPackage({
     temperature: 0.65,
     messages,
   });
-  const parsed = parseJsonFromModelContent(content);
+  let parsed = null;
+  try {
+    const contentWithoutThink = String(content || "").replace(/<think>[\s\S]*?<\/think>/gi, "").replace(/^<think\b[^>]*>/i, "").trim();
+    parsed = parseJsonFromModelContent(contentWithoutThink || content);
+  } catch (error) {
+    throw error;
+  }
   const rawPackage = Array.isArray(parsed) ? parsed[0] : parsed;
   return normalizeStylePreviewPackage({
     rawPackage,
@@ -3206,6 +3244,7 @@ async function generateSlideSectionHtml({
     signal: abortSignal,
   });
   let rawSectionHtml = "";
+  let usedFallbackRaw = false;
   try {
     const parsed = parseJsonFromModelContent(section);
     const candidate = parsed && typeof parsed === "object"
@@ -3214,6 +3253,7 @@ async function generateSlideSectionHtml({
     rawSectionHtml = String(candidate || "").trim();
   } catch (_error) {
     // Fallback for providers/models that occasionally return plain text/html.
+    usedFallbackRaw = true;
     rawSectionHtml = String(section || "").trim();
   }
   const sanitized = sanitizeSlideSectionHtml(rawSectionHtml);
@@ -3468,20 +3508,25 @@ async function callLlmChatCompletion({ config, messages, maxTokens = 1800, tempe
     await ensureManagedCreditsAvailable(config.userId, 1);
   }
   const endpoint = resolveLlmCompletionUrl(config);
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${config.apiKey}`,
-    },
-    signal,
-    body: JSON.stringify({
-      model: config.modelId,
-      messages,
-      max_tokens: maxTokens,
-      temperature,
-    }),
-  });
+  let response;
+  try {
+    response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${config.apiKey}`,
+      },
+      signal,
+      body: JSON.stringify({
+        model: config.modelId,
+        messages,
+        max_tokens: maxTokens,
+        temperature,
+      }),
+    });
+  } catch (error) {
+    throw error;
+  }
   const text = await response.text();
   let payload = {};
   try {
@@ -4132,7 +4177,36 @@ function sanitizeExportFilename(value) {
     .trim()
     .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "")
     .slice(0, 80);
-  return cleaned || "FacetDeck";
+  return cleaned;
+}
+
+function buildExportTimestampBaseName() {
+  const now = new Date();
+  const pad = (value) => String(value).padStart(2, "0");
+  return `export-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
+}
+
+function resolveExportFileName(title, extension) {
+  const normalizedExtension = String(extension || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+  const safeExtension = normalizedExtension || "txt";
+  const baseName = sanitizeExportFilename(title) || buildExportTimestampBaseName();
+  return `${baseName}.${safeExtension}`;
+}
+
+function buildAttachmentContentDisposition(fileName) {
+  const source = String(fileName || "").trim() || `${buildExportTimestampBaseName()}.txt`;
+  const asciiFallback = source
+    .normalize("NFKD")
+    .replace(/[^\x20-\x7E]/g, "")
+    .replace(/["\\]/g, "")
+    .trim() || `${buildExportTimestampBaseName()}.txt`;
+  const encoded = encodeURIComponent(source)
+    .replace(/['()]/g, escape)
+    .replace(/\*/g, "%2A");
+  return `attachment; filename="${asciiFallback}"; filename*=UTF-8''${encoded}`;
 }
 
 function generateShareCode(length = 10) {
@@ -5549,7 +5623,7 @@ app.post("/api/repository/decks/:id/share-link", authRequired, async (req, res) 
     }
     const shareCode = String(row.share_code || "").trim() || await ensureDeckShareCode(deckId);
     const baseUrl = getRequestBaseUrl(req);
-    const shareUrl = `${baseUrl}/share/${encodeURIComponent(shareCode)}`;
+    const shareUrl = `${baseUrl}/api/share/${encodeURIComponent(shareCode)}`;
     res.json({
       ok: true,
       deckId,
@@ -5564,8 +5638,8 @@ app.post("/api/repository/decks/:id/share-link", authRequired, async (req, res) 
   }
 });
 
-app.get("/share/:shareCode", async (req, res) => {
-  const shareCode = String(req.params.shareCode || "").trim().toUpperCase();
+async function renderSharedPresentationByCode(shareCodeRaw, res) {
+  const shareCode = String(shareCodeRaw || "").trim().toUpperCase();
   if (!/^[A-Z0-9]{6,24}$/.test(shareCode)) {
     res.status(404).send("Share link not found");
     return;
@@ -5599,6 +5673,14 @@ app.get("/share/:shareCode", async (req, res) => {
   } catch (error) {
     res.status(500).send(error instanceof Error ? error.message : "Failed to open shared presentation");
   }
+}
+
+app.get("/api/share/:shareCode", async (req, res) => {
+  await renderSharedPresentationByCode(req.params.shareCode, res);
+});
+
+app.get("/share/:shareCode", async (req, res) => {
+  await renderSharedPresentationByCode(req.params.shareCode, res);
 });
 
 app.post("/api/ppt/generate-outline", authRequired, async (req, res) => {
@@ -6453,9 +6535,9 @@ app.post("/api/ppt/export-pdf", authRequired, async (req, res) => {
         left: "0in",
       },
     });
-    const fileName = `${sanitizeExportFilename(title)}.pdf`;
+    const fileName = resolveExportFileName(title, "pdf");
     res.setHeader("Content-Type", "application/pdf");
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Disposition", buildAttachmentContentDisposition(fileName));
     res.send(Buffer.from(pdfBuffer));
   } catch (error) {
     res.status(500).json({
@@ -6491,9 +6573,9 @@ app.post("/api/ppt/export-html", authRequired, async (req, res) => {
       });
     }
     const exportHtml = buildOfflinePresentationHtml(offlineSlides, title);
-    const fileName = `${sanitizeExportFilename(title)}.html`;
+    const fileName = resolveExportFileName(title, "html");
     res.setHeader("Content-Type", "text/html; charset=utf-8");
-    res.setHeader("Content-Disposition", `attachment; filename="${fileName}"`);
+    res.setHeader("Content-Disposition", buildAttachmentContentDisposition(fileName));
     res.send(exportHtml);
   } catch (error) {
     res.status(500).json({

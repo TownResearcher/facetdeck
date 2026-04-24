@@ -502,7 +502,7 @@ export function EditorWizardModal({
             initial={{ scale: 0.95, opacity: 0, y: 20 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 20 }}
-            className="bg-white/90 backdrop-blur-2xl border border-white rounded-[32px] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto flex flex-col"
+            className="bg-white/90 backdrop-blur-2xl border border-white rounded-[32px] shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
           >
             <div className="flex items-center justify-between p-4 md:p-5 border-b border-slate-200/50">
               <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
@@ -517,7 +517,7 @@ export function EditorWizardModal({
               </button>
             </div>
 
-            <div className="p-4 md:p-6 flex-1 overflow-y-auto">
+            <div className="p-4 md:p-6 flex-1 min-h-0 overflow-y-auto">
               {wizardStep === 1 ? (
                 <div className="space-y-5">
                   <div>
