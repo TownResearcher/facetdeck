@@ -1,94 +1,158 @@
-
 # FacetDeck
 
-FacetDeck is a slide-authoring and AI-assisted presentation workflow product with:
+> The open-source Vibe Coding slide engine for web-native presentations.  
+> 开源的 Vibe Coding 幻灯片引擎，专为网页原生演示而生。
 
-- A web frontend (`src/`)
-- A local/self-host API server (`server/`)
-- A plugin runtime based on sandboxed iframes (`window.FacetDeck.api`)
+[Official Website](https://facetdeck.com) · [GitHub Repo](https://github.com/TownResearcher/facetdeck.git)
 
-This repository is the open-source codebase used for self-hosting and community development.
+---
 
-## Open Source + Hosted Model
+## 中文介绍
 
-- The code in this repository is open source.
-- You can self-host and bring your own model/API keys.
-- The official hosted service is a convenience SaaS for users who do not want to manage infra and provider config.
-- Runtime behavior is switched by env mode (`oss` / `saas`) in the same codebase.
-- License is `AGPL-3.0-or-later`.
+别再被“一锤子买卖”的 AI PPT 工具限制创作。  
+**FacetDeck** 的核心理念是：让大模型做它最擅长的事（写前端代码），同时把演示体验做成真正可控、可编辑、可离线的网页级幻灯片。
 
-If you modify this software and provide it as a network service, AGPL requires releasing the corresponding modified source.
+### 为什么是 FacetDeck？
+
+- **真正可控的 Vibe 工作流**：不是黑盒一键生成，而是可干预、可迭代的结构化流程。
+- **自带素材理解能力**：在生成大纲阶段即可识别并匹配你上传的图片素材。
+- **拒绝一锤子买卖**：支持对话修改、面板精修、代码直改三种不同维度的微调。
+- **死磕演示稳定性**：锁定 16:9，避免网页演示在不同屏幕下错位、溢出和滚动条。
+- **离线可播放**：支持导出静态 HTML，断网环境仍可完整展示动态效果。
+
+### 产品画面（图1-图7）
+
+![图1 - FacetDeck 截图](facetdeck_material/图1.png)
+![图2 - FacetDeck 截图](facetdeck_material/图2.png)
+
+![图3 - Setup 工作流](facetdeck_material/图3.png)
+![图4 - Setup 工作流](facetdeck_material/图4.png)
+
+![图5 - 编辑器三重微调](facetdeck_material/图5.png)
+![图6 - 编辑器三重微调](facetdeck_material/图6.png)
+![图7 - 编辑器三重微调](facetdeck_material/图7.png)
+
+### 三重微调能力
+
+- **A. 对话微调（Vibe 模式）**  
+  选中元素或整页，直接用自然语言让 AI 改风格、改结构、改文案。
+- **B. 属性面板（UI 模式）**  
+  像使用 Figma 一样进行可视化精准调节，包括文本、图片、配色与位置。
+- **C. 代码直修（Code 模式）**  
+  直接编辑底层 HTML，实时渲染预览，适合高级用户和插件开发者。
+
+### 开源与费用
+
+- 项目开源，License 为 `AGPL-3.0-or-later`。
+- 你可以自托管并接入自己的模型 API Key。
+- 使用自有模型密钥时，FacetDeck 本体不额外收费。
+- 也支持托管模式，便于不想维护基础设施的团队快速上手。
+
+---
+
+## English Overview
+
+Stop using one-shot AI PPT tools that lock you in.  
+**FacetDeck** is built around a different principle: let LLMs do what they do best (generate frontend code), while giving creators full control over layout, iteration, and delivery.
+
+### Why FacetDeck?
+
+- **Structured Vibe workflow** instead of a black-box "generate once" flow.
+- **Material-aware outline generation** that can place your uploaded assets on the right slides.
+- **Three-level editing model** for fast iteration: chat, visual panel, and direct code editing.
+- **Presentation-safe rendering** with strict 16:9 constraints across screens and projectors.
+- **Offline-ready output** with static HTML export while keeping web-native interactions.
+
+### Product Visuals (Fig.1-Fig.7)
+
+![Figure 1 - FacetDeck screenshot](facetdeck_material/图1.png)
+![Figure 2 - FacetDeck screenshot](facetdeck_material/图2.png)
+
+![Figure 3 - Setup workflow](facetdeck_material/图3.png)
+![Figure 4 - Setup workflow](facetdeck_material/图4.png)
+
+![Figure 5 - Triple editing modes](facetdeck_material/图5.png)
+![Figure 6 - Triple editing modes](facetdeck_material/图6.png)
+![Figure 7 - Triple editing modes](facetdeck_material/图7.png)
+
+### Triple Editing Modes
+
+- **A. Chat Refinement (Vibe Mode)**  
+  Use natural language to revise selected elements or full slides.
+- **B. Visual Refinement (UI Mode)**  
+  Fine-tune content and styling with direct manipulation, Figma-style.
+- **C. Code Refinement (Code Mode)**  
+  Edit slide HTML directly with instant visual feedback.
+
+---
 
 ## Quick Start
 
 ### Prerequisites
 
-- Node.js 18+ (recommended: latest LTS)
+- Node.js 18+ (latest LTS recommended)
 - npm 9+
 
-### Local development
+### Local Development
 
 1. Install dependencies
    - `npm install`
-2. Create environment file
-   - copy `.env.example` to `.env`
-   - fill required values such as `RESEND_API_KEY`, `RESEND_FROM`, `JWT_SECRET`
-   - set `FACETDECK_DISTRIBUTION_MODE=oss` and `VITE_FACETDECK_MODE=oss` for open-source mode
-3. Start both frontend and API
+2. Create env file
+   - Copy `.env.example` to `.env`
+   - Fill required values (`RESEND_API_KEY`, `RESEND_FROM`, `JWT_SECRET`, etc.)
+   - For open-source mode, set:
+     - `FACETDECK_DISTRIBUTION_MODE=oss`
+     - `VITE_FACETDECK_MODE=oss`
+3. Start full stack
    - `npm run dev:full`
 
-You can also run separately:
+Run separately if needed:
 
 - API only: `npm run dev:api`
 - Frontend only: `npm run dev`
 
-### Production build
+Build for production:
 
 - `npm run build`
 
+---
+
 ## Project Structure
 
-- `src/` - frontend app
-- `server/` - local backend/auth APIs
-- `scripts/` - development and e2e utilities
-- `examples/` - runnable sample projects (including plugin sample)
+- `src/` - frontend application
+- `server/` - backend/auth APIs
+- `examples/` - sample projects (including plugin example)
 - `guidelines/` - generation/style guideline sources
-- `docs/` - curated documentation index and archived guides
+- `docs/` - curated docs index and archived guides
 
-## Core Capabilities
-
-- User auth flows (register, login, forgot password)
-- JWT-protected APIs and route guards
-- Captcha and anti-abuse constraints
-- Plugin system with capability gating and re-authorization flow
-- Community plugin publishing/install flow
-- Editor/read-write/resource APIs for plugins
+---
 
 ## Plugin Development
 
-- Full reference: `PLUGIN_SDK.md`
-- Chinese guide: `PLUGIN_SDK_QUICKSTART_ZH.md`
+- Full SDK reference: `PLUGIN_SDK.md`
+- Chinese quickstart: `PLUGIN_SDK_QUICKSTART_ZH.md`
 - Runnable sample: `examples/facetdeck-plugin-vite-sample/`
 
-Important: running the sample project only starts the plugin frontend project, not the full FacetDeck SaaS deployment.
+---
 
-## Documentation Map
+## Documentation & Policies
 
-- Documentation index: `docs/README.md`
-- Contribution guide: `CONTRIBUTING.md`
-- Security policy: `SECURITY.md`
-- Open source boundaries: `OPEN_SOURCE_POLICY.md`
+- Docs index: `docs/README.md`
+- Contributing: `CONTRIBUTING.md`
+- Security: `SECURITY.md`
+- Open source policy: `OPEN_SOURCE_POLICY.md`
 - Trademark policy: `TRADEMARK_POLICY.md`
-- Maintainer release checklist: `docs/maintainers/OPEN_SOURCE_RELEASE_CHECKLIST.md`
-- Code of conduct: `CODE_OF_CONDUCT.md`
 - Changelog: `CHANGELOG.md`
 
-## Security and Hygiene
+---
 
-- Never commit `.env` or real API keys/secrets.
-- Never commit runtime databases or data dumps.
-- Validate `.gitignore` before publishing.
-- Read `SECURITY.md` for reporting channels and disclosure process.
+## Contact
+
+- Email: `shaungladtoseeu@gmail.com`
+
+Special thanks to `zarazhangrui` and the open-source `frontend-slides` project for inspiration.
+
+---
 
 ## License
 
