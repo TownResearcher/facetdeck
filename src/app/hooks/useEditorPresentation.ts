@@ -41,6 +41,20 @@ export function useEditorPresentation({ slides, activeSlide, setActiveSlide, act
   }, [isPresenting]);
 
   useEffect(() => {
+    if (!isPresenting) return;
+    const html = document.documentElement;
+    const body = document.body;
+    const prevHtmlOverflow = html.style.overflow;
+    const prevBodyOverflow = body.style.overflow;
+    html.style.overflow = "hidden";
+    body.style.overflow = "hidden";
+    return () => {
+      html.style.overflow = prevHtmlOverflow;
+      body.style.overflow = prevBodyOverflow;
+    };
+  }, [isPresenting]);
+
+  useEffect(() => {
     const calcContainScale = (width: number, height: number) => {
       if (width <= 0 || height <= 0) return 1;
       return Math.max(0.01, Math.min(width / BASE_SLIDE_WIDTH, height / BASE_SLIDE_HEIGHT));
