@@ -89,13 +89,16 @@ export function Header() {
             </motion.button>
           )}
           
-          <motion.button
+          <motion.a
+            href="https://github.com/TownResearcher/facetdeck.git"
+            target="_blank"
+            rel="noopener noreferrer"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="px-5 py-2 rounded-xl bg-white/60 backdrop-blur-md border border-white/40 hover:bg-white/80 transition-colors font-medium text-[#ff6b35]"
           >
             GitHub
-          </motion.button>
+          </motion.a>
 
           <motion.button
             onClick={() => navigate("/profile")}
