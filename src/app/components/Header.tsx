@@ -1,6 +1,7 @@
 import { motion } from "motion/react";
 import { useNavigate, useLocation } from "react-router";
 import { COMMUNITY_FEATURE_ENABLED } from "../config/runtimeMode";
+import facetLogo from "../../../facetlogo.svg";
 
 export function Header() {
   const navigate = useNavigate();
@@ -45,22 +46,7 @@ export function Header() {
               
               <div className="relative flex items-center gap-3">
                 {/* Logo mark */}
-                <div className="relative w-8 h-8">
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-br from-[#ff6b35] to-[#ff8a5c] rounded-lg"
-                    animate={{
-                      rotate: [0, 5, -5, 0],
-                    }}
-                    transition={{
-                      duration: 6,
-                      repeat: Infinity,
-                      ease: "easeInOut",
-                    }}
-                  />
-                  <div className="absolute inset-[3px] bg-white/90 rounded-md flex items-center justify-center">
-                    <div className="w-3 h-3 bg-gradient-to-br from-[#ff6b35] to-[#ff8a5c] rounded-sm" />
-                  </div>
-                </div>
+                <img src={facetLogo} alt="FacetDeck logo" className="w-8 h-8 object-contain" />
 
                 {/* Text */}
                 <span className="text-2xl tracking-tight bg-gradient-to-r from-[#ff6b35] to-[#ff8a5c] bg-clip-text text-transparent font-semibold">
